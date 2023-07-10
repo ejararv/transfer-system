@@ -60,8 +60,8 @@ public class Main {
         ConnectionFactory connectionFactory = new ActiveMQConnectionFactory(brokerUrl);
 
         // Настройка фабрики подключений (например, установка имени пользователя и пароля)
-        ((ActiveMQConnectionFactory) connectionFactory).setUserName("your-username");
-        ((ActiveMQConnectionFactory) connectionFactory).setPassword("your-password");
+        ((ActiveMQConnectionFactory) connectionFactory).setUserName("admin");
+        ((ActiveMQConnectionFactory) connectionFactory).setPassword("admin");
 
         return connectionFactory;
     }

@@ -2,19 +2,22 @@ package org.example.mq;
 
 import org.example.model.TransferRequest;
 import org.example.model.TransferResponse;
-import org.example.model.jaxb.ObjectFactory;
-import org.example.model.jaxb.TransferRequestType;
-import org.example.model.jaxb.TransferResponseType;
 import org.example.storage.AccountStorage;
 
-import javax.jms.JMSException;
-import javax.jms.Message;
-import javax.jms.MessageListener;
-import javax.jms.TextMessage;
-import javax.xml.bind.*;
+import javax.jms.*;
+import javax.xml.bind.JAXBContext;
+import javax.xml.bind.JAXBException;
+import javax.xml.bind.Marshaller;
+import javax.xml.bind.Unmarshaller;
+import java.io.StringReader;
+import java.io.StringWriter;
+import org.example.model.jaxb.TransferResponseType;
+
+import javax.xml.bind.JAXBElement;
+
+import org.apache.activemq.ActiveMQConnectionFactory;
 
 public class CustomMessageListener implements MessageListener {
-
     private AccountStorage accountStorage;
     private MessageHandler messageHandler;
 
@@ -43,13 +46,9 @@ public class CustomMessageListener implements MessageListener {
 
     private TransferRequest unmarshalTransferRequest(String xmlPayload) {
         try {
-            JAXBContext jaxbContext = JAXBContext.newInstance(ObjectFactory.class);
+            JAXBContext jaxbContext = JAXBContext.newInstance(TransferRequest.class);
             Unmarshaller unmarshaller = jaxbContext.createUnmarshaller();
-            JAXBElement<TransferRequestType> jaxbElement = (JAXBElement<TransferRequestType>) unmarshaller.unmarshal(new StringReader(xmlPayload));
-            TransferRequestType requestType = jaxbElement.getValue();
-            // Преобразование TransferRequestType в TransferRequest
-            // Ваш код для создания объекта TransferRequest из requestType
-            // ...
+            TransferRequest transferRequest = (TransferRequest) unmarshaller.unmarshal(new StringReader(xmlPayload));
             return transferRequest;
         } catch (JAXBException e) {
             // Обработка ошибок
@@ -60,25 +59,51 @@ public class CustomMessageListener implements MessageListener {
 
     private String marshalTransferResponse(TransferResponse response) {
         try {
-            JAXBContext jaxbContext = JAXBContext.newInstance(ObjectFactory.class);
+            JAXBContext jaxbContext = JAXBContext.newInstance(TransferResponse.class);
             Marshaller marshaller = jaxbContext.createMarshaller();
-            TransferResponseType responseType = // Преобразование TransferResponse в TransferResponseType
-                    JAXBElement<TransferResponseType> jaxbElement = new ObjectFactory().createTransferResponse(responseType);
             StringWriter writer = new StringWriter();
-            marshaller.marshal(jaxbElement, writer);
+            marshaller.marshal(response, writer);
             return writer.toString();
         } catch (JAXBException e) {
-            // Обработка ошибок
             e.printStackTrace();
         }
         return null;
     }
 
     private void sendMessage(String xmlPayload) {
-        // Отправка XML-представления ответа в MQ
-        // Здесь вам необходимо использовать JMS для отправки сообщения
+        String brokerUrl = "tcp://localhost:61616";
+        String queueName = "myQueue"; // Имя очереди для отправки сообщений
 
-        // Пример кода для отправки сообщения:
-        // producer.send(session.createTextMessage(xmlPayload));
+        try {
+
+            ConnectionFactory connectionFactory = new ActiveMQConnectionFactory(brokerUrl);
+
+
+            Connection connection = connectionFactory.createConnection();
+            connection.start();
+
+
+            Session session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
+
+            // Определение назначения (очереди или топика)
+            Destination destination = session.createQueue(queueName);
+
+            // Создание производителя сообщений JMS
+            MessageProducer producer = session.createProducer(destination);
+
+            // Создание текстового сообщения
+            TextMessage message = session.createTextMessage(xmlPayload);
+
+            // Отправка сообщения
+            producer.send(message);
+
+            // Закрытие ресурсов JMS
+            producer.close();
+            session.close();
+            connection.close();
+        } catch (JMSException e) {
+            // Обработка ошибок
+            e.printStackTrace();
+        }
     }
 }
